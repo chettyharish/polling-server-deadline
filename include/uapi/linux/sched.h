@@ -44,7 +44,7 @@
 
 /*CHANGES HERE*/
 #define SCHED_POLL	7
-#define SS_REPL_MAX 100		//Currently useless
+#define SCHED_POLL_REPL_MAX 100		//Currently useless
 /*CHANGES END HERE*/
 
 

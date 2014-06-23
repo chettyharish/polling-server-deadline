@@ -122,16 +122,20 @@ struct sched_attr {
 	u64 sched_deadline;
 	u64 sched_period;
 
+	/*CHANGES HERE*/
 	/*SCHED_POLL*/
 	struct timespec sched_poll_replenish_period;
 	struct timespec sched_poll_initial_budget;
 	int sched_poll_max_replenish;
+	/*CHANGES END HERE*/
 };
 
+/*CHANGES HERE*/
 struct sched_poll_replenish {
 	ktime_t replenish_amt;
 	ktime_t replentish_time;
 };
+/*CHANGES END HERE*/
 
 
 struct exec_domain;
@@ -1176,6 +1180,28 @@ struct sched_dl_entity {
 	 * own bandwidth to be enforced, thus we need one timer per task.
 	 */
 	struct hrtimer dl_timer;
+
+
+
+	/*CHANGES HERE*/
+
+	ktime_t sched_poll_replenish_period;
+	ktime_t sched_poll_initial_budget;
+	int sched_poll_maximum_replenish;
+	ktime_t sched_poll_current_usage;
+
+	/*Replenish*/
+	struct sched_poll_replenish sched_poll_replenish_list[SS_REPL_MAX];
+	int replenish_head;
+
+
+
+	/* SCHED_POLL timers */
+	struct hrtimer sched_poll_replenish_timer;
+	struct hrtimer sched_poll_exhaustion_timer;
+	/*CHANGES END HERE*/
+
+
 };
 
 struct rcu_node;
