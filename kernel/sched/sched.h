@@ -87,6 +87,13 @@ static inline int dl_policy(int policy)
 	return policy == SCHED_DEADLINE;
 }
 
+/*CHANGES HERE*/
+static inline int poll_policy(int policy)
+{
+	return policy == SCHED_POLL;
+}
+/*CHANGES END HERE*/
+
 static inline int task_has_rt_policy(struct task_struct *p)
 {
 	return rt_policy(p->policy);
@@ -96,6 +103,13 @@ static inline int task_has_dl_policy(struct task_struct *p)
 {
 	return dl_policy(p->policy);
 }
+
+/*CHANGES HERE*/
+static inline int task_has_poll_policy(struct task_struct *p)
+{
+	return poll_policy(p->policy);
+}
+/*CHANGES END HERE*/
 
 static inline bool dl_time_before(u64 a, u64 b)
 {

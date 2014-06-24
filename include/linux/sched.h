@@ -1191,7 +1191,7 @@ struct sched_dl_entity {
 	ktime_t sched_poll_current_usage;
 
 	/*Replenish*/
-	struct sched_poll_replenish sched_poll_replenish_list[SS_REPL_MAX];
+	struct sched_poll_replenish sched_poll_replenish_list[SCHED_POLL_REPL_MAX];
 	int replenish_head;
 
 
