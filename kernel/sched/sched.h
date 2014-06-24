@@ -84,7 +84,7 @@ static inline int rt_policy(int policy)
 
 static inline int dl_policy(int policy)
 {
-	return policy == SCHED_DEADLINE;
+	return (policy == SCHED_DEADLINE) || (policy == SCHED_POLL);
 }
 
 /*CHANGES HERE*/

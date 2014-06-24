@@ -133,7 +133,7 @@ struct sched_attr {
 /*CHANGES HERE*/
 struct sched_poll_replenish {
 	ktime_t replenish_amt;
-	ktime_t replentish_time;
+	ktime_t replenish_time;
 };
 /*CHANGES END HERE*/
 
@@ -1199,6 +1199,7 @@ struct sched_dl_entity {
 	/* SCHED_POLL timers */
 	struct hrtimer sched_poll_replenish_timer;
 	struct hrtimer sched_poll_exhaustion_timer;
+
 	/*CHANGES END HERE*/
 
 

@@ -86,6 +86,7 @@
 #include "sched.h"
 #include "../workqueue_internal.h"
 #include "../smpboot.h"
+#include "poll.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
@@ -895,7 +896,11 @@ static inline int normal_prio(struct task_struct *p)
 {
 	int prio;
 
-	if (task_has_dl_policy(p))
+	/*CHANGES HERE*/
+	if (task_has_poll_policy(p))
+		prio = MAX_POLL_PRIO-1;
+	/*CHANGES END HERE*/
+	else if (task_has_dl_policy(p))
 		prio = MAX_DL_PRIO-1;
 	else if (task_has_rt_policy(p))
 		prio = MAX_RT_PRIO-1 - p->rt_priority;
@@ -943,7 +948,7 @@ static inline void check_class_changed(struct rq *rq, struct task_struct *p,
 		if (prev_class->switched_from)
 			prev_class->switched_from(rq, p);
 		p->sched_class->switched_to(rq, p);
-	} else if (oldprio != p->prio || dl_task(p))
+	} else if (oldprio != p->prio || dl_task(p) || poll_task(p)) /*CHANGES HERE*/
 		p->sched_class->prio_changed(rq, p, oldprio);
 }
 
@@ -2716,6 +2721,11 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
+		/*CHANGES HERE*/
+		cs_notify_rt(rq, prev, next);
+		/*CHANGES END HERE*/
+
+
 		context_switch(rq, prev, next); /* unlocks the rq */
 		/*
 		 * The context switch have flipped the stack from under us
@@ -3131,6 +3141,41 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 	dl_se->dl_throttled = 0;
 	dl_se->dl_new = 1;
 	dl_se->dl_yielded = 0;
+
+	/*CHANGES HERE*/
+	if(poll_policy(p->policy)){
+		ktime_t now;
+		/*Initial deadline equal to period if not exhausted*/
+		dl_se->dl_deadline = MAX_DEADLINE;
+		dl_se->dl_runtime = 0;
+		dl_se->dl_period = ktime_to_ns(timespec_to_ktime(attr->sched_poll_replenish_period));
+
+		dl_se->sched_poll_replenish_period= timespec_to_ktime(attr->sched_poll_replenish_period);
+		dl_se->sched_poll_initial_budget=timespec_to_ktime(attr->sched_poll_initial_budget);
+		dl_se->sched_poll_maximum_replenish=attr->sched_poll_max_replenish;
+		dl_se->sched_poll_current_usage= ns_to_ktime(0);
+
+	    hrtimer_init(&dl_se->sched_poll_replenish_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+		dl_se->sched_poll_replenish_timer.function = sched_poll_replenish_cb;
+		hrtimer_init(&dl_se->sched_poll_exhaustion_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+		dl_se->sched_poll_exhaustion_timer.function = sched_poll_exhaustion_cb;
+
+		dl_se->sched_poll_replenish_list[0].replenish_amt = dl_se->sched_poll_initial_budget;
+		dl_se->sched_poll_replenish_list[0].replenish_time = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
+		dl_se->replenish_head = 0;
+
+		/*Runtime is set to 0 , so dl_w = 0*/
+		dl_se->dl_bw = to_ratio(dl_se->dl_period, dl_se->dl_runtime);
+
+		printk(KERN_DEBUG "SCHED_POLL init : dl_bw = %lld" , dl_se->dl_bw);
+
+		now = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
+		hrtimer_set_expires(&dl_se->sched_poll_replenish_timer, now);
+	}
+
+
+	/*CHANGES END HERE*/
+
 }
 
 static void __setscheduler_params(struct task_struct *p,
@@ -3143,7 +3188,7 @@ static void __setscheduler_params(struct task_struct *p,
 
 	p->policy = policy;
 
-	if (dl_policy(policy))
+	if (dl_policy(policy) || poll_policy(policy)) /*CHANGES HERE*/
 		__setparam_dl(p, attr);
 	else if (fair_policy(policy))
 		p->static_prio = NICE_TO_PRIO(attr->sched_nice);
@@ -3251,8 +3296,10 @@ static int __sched_setscheduler(struct task_struct *p,
 				const struct sched_attr *attr,
 				bool user)
 {
-	int newprio = dl_policy(attr->sched_policy) ? MAX_DL_PRIO - 1 :
-		      MAX_RT_PRIO - 1 - attr->sched_priority;
+	/*CHANGES HERE*/
+	int newprio = dl_policy(attr->sched_policy) ? (poll_policy(attr->sched_policy)?
+			  MAX_POLL_PRIO - 1: MAX_DL_PRIO - 1) :
+		      (MAX_RT_PRIO - 1 - attr->sched_priority);
 	int retval, oldprio, oldpolicy = -1, on_rq, running;
 	int policy = attr->sched_policy;
 	unsigned long flags;
@@ -4290,6 +4337,7 @@ SYSCALL_DEFINE1(sched_get_priority_max, int, policy)
 		ret = MAX_USER_RT_PRIO-1;
 		break;
 	case SCHED_DEADLINE:
+	case SCHED_POLL:		/*CHANGES HERE*/
 	case SCHED_NORMAL:
 	case SCHED_BATCH:
 	case SCHED_IDLE:
@@ -4317,6 +4365,7 @@ SYSCALL_DEFINE1(sched_get_priority_min, int, policy)
 		ret = 1;
 		break;
 	case SCHED_DEADLINE:
+	case SCHED_POLL:		/*CHANGES HERE*/
 	case SCHED_NORMAL:
 	case SCHED_BATCH:
 	case SCHED_IDLE:
