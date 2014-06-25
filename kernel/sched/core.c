@@ -91,6 +91,12 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
+
+extern void cs_notify_rt(struct rq *rq, struct task_struct *prev,
+        struct task_struct *next);
+extern enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer);
+extern enum hrtimer_restart sched_poll_exhaustion_cb(struct hrtimer *timer);
+
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
 	unsigned long delta;
@@ -3127,6 +3133,8 @@ static struct task_struct *find_process_by_pid(pid_t pid)
  * absolute deadline will be properly calculated when the task is enqueued
  * for the first time with its new policy.
  */
+
+
 static void
 __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 {
@@ -3146,8 +3154,6 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 	if(poll_policy(p->policy)){
 		ktime_t now;
 		/*Initial deadline equal to period if not exhausted*/
-		dl_se->dl_deadline = MAX_DEADLINE;
-		dl_se->dl_runtime = 0;
 		dl_se->dl_period = ktime_to_ns(timespec_to_ktime(attr->sched_poll_replenish_period));
 
 		dl_se->sched_poll_replenish_period= timespec_to_ktime(attr->sched_poll_replenish_period);
@@ -3164,7 +3170,7 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 		dl_se->sched_poll_replenish_list[0].replenish_time = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
 		dl_se->replenish_head = 0;
 
-		/*Runtime is set to 0 , so dl_w = 0*/
+		/*Runtime is set to 0 , so dl_bw = 0*/
 		dl_se->dl_bw = to_ratio(dl_se->dl_period, dl_se->dl_runtime);
 
 		printk(KERN_DEBUG "SCHED_POLL init : dl_bw = %lld" , dl_se->dl_bw);
