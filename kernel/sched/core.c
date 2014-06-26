@@ -903,7 +903,8 @@ static inline int normal_prio(struct task_struct *p)
 	if (task_has_poll_policy(p))
 		prio = MAX_POLL_PRIO-1;
 	/*CHANGES END HERE*/
-	else if (task_has_dl_policy(p))
+	else
+		if (task_has_dl_policy(p))
 		prio = MAX_DL_PRIO-1;
 	else if (task_has_rt_policy(p))
 		prio = MAX_RT_PRIO-1 - p->rt_priority;
@@ -2724,9 +2725,10 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
-		/*CHANGES HERE*/
-		cs_notify_rt(rq, prev, next);
-		/*CHANGES END HERE*/
+//		/*CHANGES HERE*/
+		if(prev->policy == SCHED_POLL || next->policy == SCHED_POLL)
+			cs_notify_rt(rq, prev, next);
+//		/*CHANGES END HERE*/
 
 
 		context_switch(rq, prev, next); /* unlocks the rq */
@@ -2980,7 +2982,7 @@ void set_user_nice(struct task_struct *p, long nice)
 	 * SCHED_DEADLINE, SCHED_FIFO or SCHED_RR:
 	 */
 	if (task_has_dl_policy(p) || task_has_rt_policy(p) || task_has_poll_policy(p)) {
-		printk(KERN_DEBUG "%s\n", __func__);
+		printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 		p->static_prio = NICE_TO_PRIO(nice);
 		goto out_unlock;
 	}
@@ -3137,7 +3139,7 @@ static void
 __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
-	printk(KERN_DEBUG "%s\n", __func__);
+	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	init_dl_task_timer(dl_se);
 	dl_se->dl_runtime = attr->sched_runtime;
 	dl_se->dl_deadline = attr->sched_deadline;
@@ -3152,8 +3154,8 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 	if(poll_policy(p->policy)){
 		ktime_t now;
 		/*Initial deadline equal to period if not exhausted*/
-		dl_se->dl_period = ktime_to_ns(timespec_to_ktime(attr->sched_poll_replenish_period));
-
+//		dl_se->dl_period = ktime_to_ns(timespec_to_ktime(attr->sched_poll_replenish_period));
+//
 		dl_se->sched_poll_replenish_period= timespec_to_ktime(attr->sched_poll_replenish_period);
 		dl_se->sched_poll_initial_budget=timespec_to_ktime(attr->sched_poll_initial_budget);
 		dl_se->sched_poll_maximum_replenish=attr->sched_poll_max_replenish;
@@ -3192,7 +3194,7 @@ static void __setscheduler_params(struct task_struct *p,
 
 	p->policy = policy;
 
-	if (dl_policy(policy) || poll_policy(policy)) /*CHANGES HERE*/
+	if (dl_policy(policy)|| poll_policy(policy)) /*CHANGES HERE*/
 		__setparam_dl(p, attr);
 	else if (fair_policy(policy))
 		p->static_prio = NICE_TO_PRIO(attr->sched_nice);
@@ -3304,6 +3306,9 @@ static int __sched_setscheduler(struct task_struct *p,
 	int newprio = dl_policy(attr->sched_policy) ? (poll_policy(attr->sched_policy)?
 			  MAX_POLL_PRIO - 1: MAX_DL_PRIO - 1) :
 		      (MAX_RT_PRIO - 1 - attr->sched_priority);
+
+//	int newprio = dl_policy(attr->sched_policy) ? MAX_DL_PRIO - 1 :
+//		      (MAX_RT_PRIO - 1 - attr->sched_priority);
 	int retval, oldprio, oldpolicy = -1, on_rq, running;
 	int policy = attr->sched_policy;
 	unsigned long flags;
