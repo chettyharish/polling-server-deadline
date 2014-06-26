@@ -1214,6 +1214,12 @@ extern void init_sched_rt_class(void);
 extern void init_sched_fair_class(void);
 extern void init_sched_dl_class(void);
 
+/*CHANGES HERE*/
+extern void cs_notify_rt(struct rq *rq, struct task_struct *prev, struct task_struct *next);
+extern enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer);
+extern enum hrtimer_restart sched_poll_exhaustion_cb(struct hrtimer *timer);
+/*CHANGES END HERE*/
+
 extern void resched_task(struct task_struct *p);
 extern void resched_cpu(int cpu);
 

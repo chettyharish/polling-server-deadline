@@ -37,7 +37,7 @@ static inline ktime_t sched_poll_capacity(struct task_struct *p, ktime_t now)
 
 static inline int sched_poll_out_of_budget(struct task_struct *p, ktime_t now)
 {
-	return ktime_cmp(sched_poll_capacity(p, now), ns_to_ktime(0)) <= 0;
+	return ktime_compare(sched_poll_capacity(p, now), ns_to_ktime(0)) <= 0;
 }
 
 static inline ktime_t sched_poll_get_now(struct task_struct *p)
@@ -1694,12 +1694,12 @@ static void prio_changed_dl(struct rq *rq, struct task_struct *p,
 static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
 {
 	int periods = 0;
-	printk(KERN_DEBUG "%s\n", __func__);
-
 	struct hrtimer *timer = &p->dl.sched_poll_replenish_timer;
 	ktime_t interval = p->dl.sched_poll_replenish_period;
 
-	if (ktime_cmp(hrtimer_get_expires(timer), now) > 0) {
+	printk(KERN_DEBUG "%s\n", __func__);
+
+	if (ktime_compare(hrtimer_get_expires(timer), now) > 0) {
 		/* timer already set to beginning of next period */
 		return 0;
 	}
@@ -1707,7 +1707,7 @@ static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
 	do {
 		periods++;
 		hrtimer_add_expires(timer, interval);
-	} while(ktime_cmp(hrtimer_get_expires(timer), now) <= 0);
+	} while(ktime_compare(hrtimer_get_expires(timer), now) <= 0);
 
 	return periods;
 }
@@ -1734,11 +1734,11 @@ static void sched_poll_set_exhaustion_timer(struct rq *rq, struct task_struct *p
 			printk(KERN_ERR "running task with no budget\n");
 		}
 
-		if (ktime_cmp(timer_exp, sched_poll_get_now(p)) <= 0) {
+		if (ktime_compare(timer_exp, sched_poll_get_now(p)) <= 0) {
 			printk(KERN_ERR "setting exhaust timer to expire in the past\n");
 		}
 
-		if (ktime_cmp(timer_exp, hrtimer_get_expires(&p->dl.sched_poll_replenish_time)) > 0) {
+		if (ktime_compare(timer_exp, hrtimer_get_expires(&p->dl.sched_poll_replenish_timer)) > 0) {
 			printk(KERN_ERR "expiration time greater than replenishment (overloaded?)\n");
 		} else {
 			if (!(p->dl.dl_throttled)) {
@@ -1775,7 +1775,7 @@ static void sched_poll_switch_dl(struct rq *rq, struct task_struct *p,
 }
 
 
-static enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
+enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 {
 	struct sched_dl_entity *dl_se;
 	struct task_struct *p;
@@ -1798,7 +1798,7 @@ static enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 	running = task_running(rq, p);
 
 	/* exh timer may be active if task was preempted for a long time */
-	if (ktime_cmp(p->dl.sched_poll_current_usage, p->dl.sched_poll_initial_budget) > 0) {
+	if (ktime_compare(p->dl.sched_poll_current_usage, p->dl.sched_poll_initial_budget) > 0) {
 		ktime_t budget = ktime_sub(p->dl.sched_poll_initial_budget, p->dl.sched_poll_current_usage);
 
 		/* -5000 is just a fudge factor */
@@ -1822,7 +1822,7 @@ static enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 	/* now is relative to start of previous period, prevents drift */
 	now = ktime_sub(hrtimer_get_expires(timer), p->dl.sched_poll_replenish_period);
 
-	if (ktime_cmp(now, ns_to_ktime(0)) == -1)
+	if (ktime_compare(now, ns_to_ktime(0)) == -1)
 		printk(KERN_ERR "SCHED_SPORADIC: negative now\n");
 
 	if (periods_passed != 1)
@@ -1841,7 +1841,7 @@ static enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 	return HRTIMER_RESTART;
 }
 
-static enum hrtimer_restart sched_poll_exhaustion_cb(struct hrtimer *timer)
+enum hrtimer_restart sched_poll_exhaustion_cb(struct hrtimer *timer)
 {
 	struct task_struct *p;
 	struct sched_dl_entity *dl_se;
@@ -1885,7 +1885,7 @@ static void sched_poll_budget_check(struct rq *rq, struct task_struct *p, ktime_
 	}
 }
 
-static void cs_notify_rt(struct rq *rq, struct task_struct *prev,
+void cs_notify_rt(struct rq *rq, struct task_struct *prev,
               struct task_struct *next)
 {
 	/* arm exhaust timer to minimize overrun */

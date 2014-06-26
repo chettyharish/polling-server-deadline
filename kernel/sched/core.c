@@ -92,10 +92,7 @@
 #include <trace/events/sched.h>
 
 
-extern void cs_notify_rt(struct rq *rq, struct task_struct *prev,
-        struct task_struct *next);
-extern enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer);
-extern enum hrtimer_restart sched_poll_exhaustion_cb(struct hrtimer *timer);
+
 
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
