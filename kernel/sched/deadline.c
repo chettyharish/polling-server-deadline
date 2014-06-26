@@ -45,6 +45,44 @@ static inline ktime_t sched_poll_get_now(struct task_struct *p)
 	return hrtimer_cb_get_time(&p->dl.sched_poll_replenish_timer);
 }
 
+
+/* forward the replenishment time in interval(polling) increments */
+static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
+{
+	int periods = 0;
+	struct hrtimer *timer = &p->dl.sched_poll_replenish_timer;
+	ktime_t interval = p->dl.sched_poll_replenish_period;
+
+	printk(KERN_DEBUG "%s\n", __func__);
+
+	if (ktime_compare(hrtimer_get_expires(timer), now) > 0) {
+		/* timer already set to beginning of next period */
+		return 0;
+	}
+
+	do {
+		periods++;
+		hrtimer_add_expires(timer, interval);
+	} while(ktime_compare(hrtimer_get_expires(timer), now) <= 0);
+
+	return periods;
+}
+
+
+static void sched_poll_switch_dl(struct rq *rq, struct task_struct *p,
+	bool replenish)
+{
+	struct sched_dl_entity *dl_se = &p->dl;
+	if(replenish){
+		dl_se->sched_poll_current_usage = ns_to_ktime(0);
+	}
+	else{
+		dl_se->sched_poll_current_usage = p->dl.sched_poll_replenish_list[p->dl.replenish_head].replenish_amt;
+	}
+	resched_task(rq->curr);
+
+}
+
 /*CHANGES END HERE*/
 
 static inline struct task_struct *dl_task_of(struct sched_dl_entity *dl_se)
@@ -877,6 +915,20 @@ static void dequeue_dl_entity(struct sched_dl_entity *dl_se)
 	__dequeue_dl_entity(dl_se);
 }
 
+static bool sched_poll_unblock_check(struct rq *rq, struct task_struct *p, ktime_t now, bool start_repl_timer, bool running)
+{
+	if(start_repl_timer){
+		sched_poll_fwd_repl_timer(p, now);
+		hrtimer_restart(&p->dl.sched_poll_exhaustion_timer);
+		return false;
+	}
+	else{
+		return true;
+	}
+}
+
+
+
 static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct task_struct *pi_task = rt_mutex_get_top_task(p);
@@ -900,6 +952,15 @@ static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 	if (p->dl.dl_throttled)
 		return;
 
+	/*CHANGES HERE*/
+	if (p->policy == SCHED_POLL) {
+		bool running = task_running(rq, p);
+		if(!sched_poll_unblock_check(rq, p, sched_poll_get_now(p), true, running))
+			return;
+	}
+	/*CHANGES END HERE*/
+
+
 	enqueue_dl_entity(&p->dl, pi_se, flags);
 
 	if (!task_current(rq, p) && p->nr_cpus_allowed > 1)
@@ -914,7 +975,24 @@ static void __dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 
 static void dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 {
+	ktime_t now ;
 	update_curr_dl(rq);
+
+	/*
+	 * place here so p->on_rq is consistent, that is before we actually
+	 * dequeue, so any functions called can use p->on_rq and it will be
+	 * accurate.  p->on_rq will be set after this function.
+	 */
+	if (p->policy == SCHED_POLL) {
+		now = sched_poll_get_now(p);
+		WARN_ON_ONCE(!hrtimer_active(&p->dl.sched_poll_exhaustion_timer));
+		WARN_ON_ONCE(hrtimer_try_to_cancel(&p->dl.sched_poll_exhaustion_timer) == -1);
+		WARN_ON_ONCE(!hrtimer_active(&p->dl.sched_poll_replenish_timer));
+		WARN_ON_ONCE(hrtimer_try_to_cancel(&p->dl.sched_poll_replenish_timer) == -1);
+		sched_poll_switch_dl(rq, p, false);
+
+	}
+
 	__dequeue_task_dl(rq, p, flags);
 }
 
@@ -1688,31 +1766,7 @@ static void prio_changed_dl(struct rq *rq, struct task_struct *p,
 
 
 
-/*CHANGES HERE*/
 
-/* forward the replenishment time in interval(polling) increments */
-static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
-{
-	int periods = 0;
-	struct hrtimer *timer = &p->dl.sched_poll_replenish_timer;
-	ktime_t interval = p->dl.sched_poll_replenish_period;
-
-	printk(KERN_DEBUG "%s\n", __func__);
-
-	if (ktime_compare(hrtimer_get_expires(timer), now) > 0) {
-		/* timer already set to beginning of next period */
-		return 0;
-	}
-
-	do {
-		periods++;
-		hrtimer_add_expires(timer, interval);
-	} while(ktime_compare(hrtimer_get_expires(timer), now) <= 0);
-
-	return periods;
-}
-
-/*CHANGES END HERE*/
 
 /*CHANGES HERE*/
 
@@ -1757,23 +1811,6 @@ static void sched_poll_set_exhaustion_timer(struct rq *rq, struct task_struct *p
 
 
 /*CHANGES HERE*/
-
-static void sched_poll_switch_dl(struct rq *rq, struct task_struct *p,
-	bool replenish)
-{
-	struct sched_dl_entity *dl_se = &p->dl;
-
-	if(replenish){
-		dl_se->sched_poll_current_usage = ns_to_ktime(0);
-	}
-	else{
-		dl_se->sched_poll_current_usage = p->dl.sched_poll_replenish_list[p->dl.replenish_head].replenish_amt;
-	}
-
-	resched_task(rq->curr);
-
-}
-
 
 enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 {
