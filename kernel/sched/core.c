@@ -2980,6 +2980,7 @@ void set_user_nice(struct task_struct *p, long nice)
 	 * SCHED_DEADLINE, SCHED_FIFO or SCHED_RR:
 	 */
 	if (task_has_dl_policy(p) || task_has_rt_policy(p) || task_has_poll_policy(p)) {
+		printk(KERN_DEBUG "%s\n", __func__);
 		p->static_prio = NICE_TO_PRIO(nice);
 		goto out_unlock;
 	}
@@ -3136,7 +3137,7 @@ static void
 __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
-
+	printk(KERN_DEBUG "%s\n", __func__);
 	init_dl_task_timer(dl_se);
 	dl_se->dl_runtime = attr->sched_runtime;
 	dl_se->dl_deadline = attr->sched_deadline;
