@@ -86,7 +86,6 @@
 #include "sched.h"
 #include "../workqueue_internal.h"
 #include "../smpboot.h"
-#include "poll.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>

@@ -3,6 +3,9 @@
 #include <linux/sched/sysctl.h>
 #include <linux/sched/rt.h>
 #include <linux/sched/deadline.h>
+/*CHANGES HERE*/
+#include <linux/sched/sched_poll.h>
+/*CHANGES END HERE*/
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/stop_machine.h>
@@ -90,7 +93,8 @@ static inline int dl_policy(int policy)
 /*CHANGES HERE*/
 static inline int poll_policy(int policy)
 {
-	return policy == SCHED_POLL;
+	return 0;
+	//return policy == SCHED_POLL;
 }
 /*CHANGES END HERE*/
 
