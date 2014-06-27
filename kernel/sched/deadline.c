@@ -40,6 +40,9 @@ static inline ktime_t sched_poll_capacity(struct task_struct *p, ktime_t now)
 static inline int sched_poll_out_of_budget(struct task_struct *p, ktime_t now)
 {
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
+	if(!poll_task(p))
+		return 0;
+
 	return ktime_compare(sched_poll_capacity(p, now), ns_to_ktime(0)) <= 0;
 }
 
@@ -707,12 +710,12 @@ static void update_curr_dl(struct rq *rq)
 
 	//CHANGES HERE
 	if(poll_task(curr)){
-	dl_se->sched_poll_current_usage = ktime_add_ns(dl_se->sched_poll_current_usage, delta_exec);
-	now = sched_poll_get_now(curr);
+		dl_se->sched_poll_current_usage = ktime_add_ns(dl_se->sched_poll_current_usage, delta_exec);
+		now = sched_poll_get_now(curr);
 	}
 
 	/*Setting runtime to 0 will force dequeue a task for SCHED_POLL*/
-	if (dl_runtime_exceeded(rq, dl_se) /*|| sched_poll_out_of_budget(curr,now)*/ ) {
+	if (dl_runtime_exceeded(rq, dl_se) || sched_poll_out_of_budget(curr,now)) {
 	//CHANGES END HERE
 		__dequeue_task_dl(rq, curr, 0);
 		if (likely(start_dl_timer(dl_se, curr->dl.dl_boosted)))

@@ -16,10 +16,10 @@ static inline int poll_prio(int prio)
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	printk(KERN_ERR " POLL PRIO : \t%d\n", prio);
 
+	//return 0;
+	if (unlikely(prio == MAX_POLL_PRIO-1))
+		return 1;
 	return 0;
-//	if (unlikely(prio < MAX_POLL_PRIO))
-//		return 1;
-//	return 0;
 }
 
 static inline int poll_task(struct task_struct *p)
