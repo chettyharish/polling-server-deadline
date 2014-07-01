@@ -32,6 +32,7 @@ struct sched_attr {
 	struct timespec sched_poll_initial_budget;
 	int sched_poll_max_replenish;
 };
+
 #ifdef __x86_64__
 #define __NR_sched_setattr              314
 #define __NR_sched_getattr              315
@@ -99,7 +100,6 @@ static void usageError(char *pname) {
 
 int main(int argc, char *argv[]) {
 	size_t size, alloc_size;
-	;
 	int opt, flags, val;
 	struct sched_attr *sa;
 	pid_t pid;
@@ -204,10 +204,10 @@ int main(int argc, char *argv[]) {
 		sa->sched_policy = SCHED_POLL;
 		sa->sched_runtime = atoll(argv[optind + 1]) * timeFactor;
 		sa->sched_deadline = atoll(argv[optind + 2]) * timeFactor;
-		sa->sched_period = atoll(argv[optind + 3]) * timeFactor;
-		sa->sched_poll_initial_budget = setupTSfromMS(atoll(argv[optind + 4]) * timeFactor);
+		sa->sched_period = atoll(argv[optind + 3]) * timeFactor;	
 		sa->sched_poll_replenish_period = setupTSfromMS(
-				atoll(argv[optind + 5]) * timeFactor);
+				atoll(argv[optind + 4]) * timeFactor);
+		sa->sched_poll_initial_budget = setupTSfromMS(atoll(argv[optind + 5]) * timeFactor);
 		sa->sched_poll_max_replenish = atoll(argv[optind + 6]);
 
 		printf("Runtime  =           %25" PRIu64
@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 				sa->sched_poll_replenish_period.tv_sec,
 				sa->sched_poll_max_replenish);
 		break;
-
+// -EINVAL
 	default:
 		usageError(argv[0]);
 	}
@@ -228,11 +228,14 @@ int main(int argc, char *argv[]) {
 
 	usleep(10000);
 	base = time(NULL);
+	system("cat /var/log/syslog");
 	if (sched_setattr(pid, sa, 0) == -1) {
 		perror("sched_setattr");
 		printf("sa->size = %" PRIu32 "\n", sa->size);
 		exit(EXIT_FAILURE);
 	}
+	system("cat /var/log/syslog");
+
 	usleep(10000); /* Without this small sleep, time() does not
 	 seem to return an up-to-date time. Some VDSO
 	 effect? */

@@ -59,7 +59,9 @@ struct sched_param {
 
 #include <asm/processor.h>
 
-#define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
+/*CHANGES HERE*/
+#define SCHED_ATTR_SIZE_VER0	88	/* sizeof first published struct */
+/*CHANGES END HERE*/
 
 /*
  * Extended scheduling parameters data structure.

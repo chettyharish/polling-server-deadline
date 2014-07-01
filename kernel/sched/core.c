@@ -2724,10 +2724,10 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
-//		/*CHANGES HERE*/
+		/*CHANGES HERE*/
 		if(prev->policy == SCHED_POLL || next->policy == SCHED_POLL)
 			cs_notify_rt(rq, prev, next);
-//		/*CHANGES END HERE*/
+		/*CHANGES END HERE*/
 
 
 		context_switch(rq, prev, next); /* unlocks the rq */
@@ -2981,7 +2981,6 @@ void set_user_nice(struct task_struct *p, long nice)
 	 * SCHED_DEADLINE, SCHED_FIFO or SCHED_RR:
 	 */
 	if (task_has_dl_policy(p) || task_has_rt_policy(p) || task_has_poll_policy(p)) {
-		printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 		p->static_prio = NICE_TO_PRIO(nice);
 		goto out_unlock;
 	}
@@ -3138,7 +3137,7 @@ static void
 __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
+
 	init_dl_task_timer(dl_se);
 	dl_se->dl_runtime = attr->sched_runtime;
 	dl_se->dl_deadline = attr->sched_deadline;
@@ -3154,7 +3153,7 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 		ktime_t now;
 		/*Initial deadline equal to period if not exhausted*/
 //		dl_se->dl_period = ktime_to_ns(timespec_to_ktime(attr->sched_poll_replenish_period));
-//
+
 		dl_se->sched_poll_replenish_period= timespec_to_ktime(attr->sched_poll_replenish_period);
 		dl_se->sched_poll_initial_budget=timespec_to_ktime(attr->sched_poll_initial_budget);
 		dl_se->sched_poll_maximum_replenish=attr->sched_poll_max_replenish;
@@ -3170,7 +3169,7 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 		dl_se->replenish_head = 0;
 
 		/*Runtime is set to 0 , so dl_bw = 0*/
-		dl_se->dl_bw = to_ratio(dl_se->dl_period, dl_se->dl_runtime);
+//		dl_se->dl_bw = to_ratio(dl_se->dl_period, dl_se->dl_runtime);
 
 		printk(KERN_DEBUG "SCHED_POLL init : dl_bw = %lld" , dl_se->dl_bw);
 
@@ -3186,6 +3185,7 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 static void __setscheduler_params(struct task_struct *p,
 		const struct sched_attr *attr)
 {
+
 	int policy = attr->sched_policy;
 
 	if (policy == -1) /* setparam */
@@ -3212,6 +3212,7 @@ static void __setscheduler_params(struct task_struct *p,
 static void __setscheduler(struct rq *rq, struct task_struct *p,
 			   const struct sched_attr *attr)
 {
+
 	__setscheduler_params(p, attr);
 
 	/*
@@ -3231,6 +3232,7 @@ static void __setscheduler(struct rq *rq, struct task_struct *p,
 static void
 __getparam_dl(struct task_struct *p, struct sched_attr *attr)
 {
+
 	struct sched_dl_entity *dl_se = &p->dl;
 
 	attr->sched_priority = p->rt_priority;
@@ -3253,6 +3255,7 @@ __getparam_dl(struct task_struct *p, struct sched_attr *attr)
 static bool
 __checkparam_dl(const struct sched_attr *attr)
 {
+
 	/* deadline != 0 */
 	if (attr->sched_deadline == 0)
 		return false;
@@ -3301,13 +3304,12 @@ static int __sched_setscheduler(struct task_struct *p,
 				const struct sched_attr *attr,
 				bool user)
 {
+
 	/*CHANGES HERE*/
 	int newprio = dl_policy(attr->sched_policy) ? (poll_policy(attr->sched_policy)?
 			  MAX_POLL_PRIO - 1: MAX_DL_PRIO - 1) :
 		      (MAX_RT_PRIO - 1 - attr->sched_priority);
 
-//	int newprio = dl_policy(attr->sched_policy) ? MAX_DL_PRIO - 1 :
-//		      (MAX_RT_PRIO - 1 - attr->sched_priority);
 	int retval, oldprio, oldpolicy = -1, on_rq, running;
 	int policy = attr->sched_policy;
 	unsigned long flags;
@@ -3328,7 +3330,7 @@ recheck:
 		if (policy != SCHED_DEADLINE &&
 				policy != SCHED_FIFO && policy != SCHED_RR &&
 				policy != SCHED_NORMAL && policy != SCHED_BATCH &&
-				policy != SCHED_IDLE)
+				policy != SCHED_IDLE && policy != SCHED_POLL) /*CHANGES HERE*/
 			return -EINVAL;
 	}
 
@@ -3536,6 +3538,7 @@ change:
 static int _sched_setscheduler(struct task_struct *p, int policy,
 			       const struct sched_param *param, bool check)
 {
+
 	struct sched_attr attr = {
 		.sched_policy   = policy,
 		.sched_priority = param->sched_priority,
@@ -3623,6 +3626,7 @@ do_sched_setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 static int sched_copy_attr(struct sched_attr __user *uattr,
 			   struct sched_attr *attr)
 {
+
 	u32 size;
 	int ret;
 
@@ -3729,6 +3733,7 @@ SYSCALL_DEFINE2(sched_setparam, pid_t, pid, struct sched_param __user *, param)
 SYSCALL_DEFINE3(sched_setattr, pid_t, pid, struct sched_attr __user *, uattr,
 			       unsigned int, flags)
 {
+
 	struct sched_attr attr;
 	struct task_struct *p;
 	int retval;

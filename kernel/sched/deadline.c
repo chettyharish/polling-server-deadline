@@ -1931,12 +1931,10 @@ void cs_notify_rt(struct rq *rq, struct task_struct *prev,
 	//deadline.c
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (next->policy == SCHED_POLL) {
-		printk(KERN_DEBUG" POLL FUNCTION : \t NEXT POLL\n");
 		sched_poll_set_exhaustion_timer(rq, next, sched_poll_get_now(next), true);
 	}
 
 	if (prev->policy == SCHED_POLL) {
-		printk(KERN_DEBUG" POLL FUNCTION : \t CURR POLL\n");
 		ktime_t now = sched_poll_get_now(prev);
 
 		/* TODO: !prev->on_rq or false */
