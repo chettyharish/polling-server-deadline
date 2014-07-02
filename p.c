@@ -67,7 +67,7 @@ static int sched_setattr(pid_t pid, const struct sched_attr *attr,
 
 static struct timespec setupTSfromMS(long long int time) {
 	struct timespec ts;
-	ts.tv_sec = time ;
+	ts.tv_sec = time;
 	ts.tv_nsec = (time % 1000000) * 1000000;
 
 	return ts;
@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
 		sa->sched_deadline = atoll(argv[optind + 2]) * timeFactor;
 		sa->sched_period = atoll(argv[optind + 3]) * timeFactor;
 		printf("Runtime  = %25" PRIu64 "\nDeadline = %25" PRIu64
-		"\nPeriod   = %25" PRIu64 "\n", sa->sched_runtime, sa->sched_deadline,
+				"\nPeriod   = %25" PRIu64 "\n", sa->sched_runtime, sa->sched_deadline,
 				sa->sched_period);
 		break;
 
@@ -204,18 +204,18 @@ int main(int argc, char *argv[]) {
 		sa->sched_policy = SCHED_POLL;
 		sa->sched_runtime = atoll(argv[optind + 1]) * timeFactor;
 		sa->sched_deadline = atoll(argv[optind + 2]) * timeFactor;
-		sa->sched_period = atoll(argv[optind + 3]) * timeFactor;	
+		sa->sched_period = atoll(argv[optind + 3]) * timeFactor;
 		sa->sched_poll_replenish_period = setupTSfromMS(
-				atoll(argv[optind + 4]) * timeFactor);
-		sa->sched_poll_initial_budget = setupTSfromMS(atoll(argv[optind + 5]) * timeFactor);
-		sa->sched_poll_max_replenish = atoll(argv[optind + 6]);
+				atoll(argv[optind + 4]));
+		sa->sched_poll_initial_budget = setupTSfromMS(atoll(argv[optind + 5]));
+		sa->sched_poll_max_replenish = atoll(argv[optind + 6]) * timeFactor;
 
 		printf("Runtime  =           %25" PRIu64
-		"\nDeadline =           %25" PRIu64
-		"\nPeriod   =           %25" PRIu64
-		"\nPoll_init_budget   = %25" PRIu64
-		"\nPoll_repl_period   = %25" PRIu64
-		"\nMax                = %25" PRIu64 "\n", sa->sched_runtime, sa->sched_deadline,
+				"\nDeadline =           %25" PRIu64
+				"\nPeriod   =           %25" PRIu64
+				"\nPoll_init_budget   = %25" PRIu64
+				"\nPoll_repl_period   = %25" PRIu64
+				"\nMax                = %25" PRIu64 "\n", sa->sched_runtime, sa->sched_deadline,
 				sa->sched_period, sa->sched_poll_initial_budget.tv_sec,
 				sa->sched_poll_replenish_period.tv_sec,
 				sa->sched_poll_max_replenish);

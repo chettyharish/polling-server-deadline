@@ -93,8 +93,7 @@ static inline int dl_policy(int policy)
 /*CHANGES HERE*/
 static inline int poll_policy(int policy)
 {
-	return 0;
-	//return policy == SCHED_POLL;
+	return policy == SCHED_POLL;
 }
 /*CHANGES END HERE*/
 

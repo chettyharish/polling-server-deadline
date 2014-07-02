@@ -59,13 +59,17 @@ static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
 	ktime_t interval = p->dl.sched_poll_replenish_period;
 
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
+	printk(KERN_ERR " POLL FUNCTION : \t%lld, \t %lld\t %d\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,ktime_compare(hrtimer_get_expires(timer), now));
 
 	if (ktime_compare(hrtimer_get_expires(timer), now) > 0) {
 		/* timer already set to beginning of next period */
+		printk(KERN_ERR " POLL FUNCTION : \t%lld, \t %lld\t %d\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,ktime_compare(hrtimer_get_expires(timer), now));
 		return 0;
 	}
 
 	do {
+		printk(KERN_ERR " POLL FUNCTION : \t%lld, \t %lld\t %d\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,ktime_compare(hrtimer_get_expires(timer), now));
+
 		periods++;
 		hrtimer_add_expires(timer, interval);
 	} while(ktime_compare(hrtimer_get_expires(timer), now) <= 0);
@@ -929,14 +933,18 @@ static void dequeue_dl_entity(struct sched_dl_entity *dl_se)
 static bool sched_poll_unblock_check(struct rq *rq, struct task_struct *p, ktime_t now, bool start_repl_timer, bool running)
 {
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	if(start_repl_timer){
+//	if(start_repl_timer){
 		sched_poll_fwd_repl_timer(p, now);
+		printk(KERN_ERR " POLL FUNCTION : \t%s\n", "before timer");
 		hrtimer_restart(&p->dl.sched_poll_exhaustion_timer);
+		printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 		return false;
-	}
-	else{
-		return true;
-	}
+//	}
+//	else{
+//		printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
+//		return true;
+//
+//	}
 }
 
 
@@ -968,8 +976,8 @@ static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (p->policy == SCHED_POLL) {
 		bool running = task_running(rq, p);
-		if(!sched_poll_unblock_check(rq, p, sched_poll_get_now(p), true, running))
-			return;
+		sched_poll_unblock_check(rq, p, sched_poll_get_now(p), true, running);
+
 	}
 	/*CHANGES END HERE*/
 
