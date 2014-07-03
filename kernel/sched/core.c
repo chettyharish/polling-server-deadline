@@ -3161,8 +3161,8 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 
 	    hrtimer_init(&dl_se->sched_poll_replenish_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 		dl_se->sched_poll_replenish_timer.function = sched_poll_replenish_cb;
-		hrtimer_init(&dl_se->sched_poll_exhaustion_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
-		dl_se->sched_poll_exhaustion_timer.function = sched_poll_exhaustion_cb;
+//		hrtimer_init(&dl_se->sched_poll_exhaustion_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+//		dl_se->sched_poll_exhaustion_timer.function = sched_poll_exhaustion_cb;
 
 		dl_se->sched_poll_replenish_list[0].replenish_amt = dl_se->sched_poll_initial_budget;
 		dl_se->sched_poll_replenish_list[0].replenish_time = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
@@ -3177,7 +3177,7 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 
 		now = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
 		hrtimer_set_expires(&dl_se->sched_poll_replenish_timer, dl_se->sched_poll_replenish_period);
-		hrtimer_set_expires(&dl_se->sched_poll_exhaustion_timer, dl_se->sched_poll_initial_budget);
+//		hrtimer_set_expires(&dl_se->sched_poll_exhaustion_timer, dl_se->sched_poll_initial_budget);
 	}
 
 

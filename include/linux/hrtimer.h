@@ -372,7 +372,6 @@ extern int hrtimer_try_to_cancel(struct hrtimer *timer);
 static inline int hrtimer_start_expires(struct hrtimer *timer,
 						enum hrtimer_mode mode)
 {
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	unsigned long delta;
 	ktime_t soft, hard;
 	soft = hrtimer_get_softexpires(timer);
@@ -383,7 +382,6 @@ static inline int hrtimer_start_expires(struct hrtimer *timer,
 
 static inline int hrtimer_restart(struct hrtimer *timer)
 {
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	return hrtimer_start_expires(timer, HRTIMER_MODE_ABS);
 }
 

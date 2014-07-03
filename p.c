@@ -199,16 +199,16 @@ int main(int argc, char *argv[]) {
 		break;
 
 	case 'p':
-		if (argc != optind + 7)
+		if (argc != optind + 4)
 			usageError(argv[0]);
 		sa->sched_policy = SCHED_POLL;
 		sa->sched_runtime = atoll(argv[optind + 1]) * timeFactor;
 		sa->sched_deadline = atoll(argv[optind + 2]) * timeFactor;
-		sa->sched_period = atoll(argv[optind + 3]) * timeFactor;
+		sa->sched_period = atoll(argv[optind + 2]) * timeFactor;
 		sa->sched_poll_replenish_period = setupTSfromMS(
-				atoll(argv[optind + 4]));
-		sa->sched_poll_initial_budget = setupTSfromMS(atoll(argv[optind + 5]));
-		sa->sched_poll_max_replenish = atoll(argv[optind + 6]) * timeFactor;
+				atoll(argv[optind + 3]));
+		sa->sched_poll_initial_budget = setupTSfromMS(atoll(argv[optind + 1]));
+		sa->sched_poll_max_replenish = atoll(argv[optind + 1]) * timeFactor;
 
 		printf("Runtime  =           %25" PRIu64
 				"\nDeadline =           %25" PRIu64
@@ -228,13 +228,11 @@ int main(int argc, char *argv[]) {
 
 	usleep(10000);
 	base = time(NULL);
-	system("cat /var/log/syslog");
 	if (sched_setattr(pid, sa, 0) == -1) {
 		perror("sched_setattr");
 		printf("sa->size = %" PRIu32 "\n", sa->size);
 		exit(EXIT_FAILURE);
 	}
-	system("cat /var/log/syslog");
 
 	usleep(10000); /* Without this small sleep, time() does not
 	 seem to return an up-to-date time. Some VDSO
