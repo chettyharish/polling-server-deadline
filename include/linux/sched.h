@@ -1189,18 +1189,11 @@ struct sched_dl_entity {
 
 	ktime_t sched_poll_replenish_period;
 	ktime_t sched_poll_initial_budget;
-	int sched_poll_maximum_replenish;
 	ktime_t sched_poll_current_usage;
-
-	/*Replenish*/
-	struct sched_poll_replenish sched_poll_replenish_list[SCHED_POLL_REPL_MAX];
-	int replenish_head;
-
 
 
 	/* SCHED_POLL timers */
 	struct hrtimer sched_poll_replenish_timer;
-	struct hrtimer sched_poll_exhaustion_timer;
 
 	/*CHANGES END HERE*/
 

@@ -208,17 +208,15 @@ int main(int argc, char *argv[]) {
 		sa->sched_poll_replenish_period = setupTSfromMS(
 				atoll(argv[optind + 3]));
 		sa->sched_poll_initial_budget = setupTSfromMS(atoll(argv[optind + 1]));
-		sa->sched_poll_max_replenish = atoll(argv[optind + 1]) * timeFactor;
+		sa->sched_poll_max_replenish = 0;
 
 		printf("Runtime  =           %25" PRIu64
 				"\nDeadline =           %25" PRIu64
 				"\nPeriod   =           %25" PRIu64
 				"\nPoll_init_budget   = %25" PRIu64
-				"\nPoll_repl_period   = %25" PRIu64
-				"\nMax                = %25" PRIu64 "\n", sa->sched_runtime, sa->sched_deadline,
+				"\nPoll_repl_period   = %25" PRIu64 "\n", sa->sched_runtime, sa->sched_deadline,
 				sa->sched_period, sa->sched_poll_initial_budget.tv_sec,
-				sa->sched_poll_replenish_period.tv_sec,
-				sa->sched_poll_max_replenish);
+				sa->sched_poll_replenish_period.tv_sec);
 		break;
 // -EINVAL
 	default:
@@ -232,6 +230,8 @@ int main(int argc, char *argv[]) {
 		perror("sched_setattr");
 		printf("sa->size = %" PRIu32 "\n", sa->size);
 		exit(EXIT_FAILURE);
+	}else{
+		printf("SIZE = %" PRIu32 "\n", sa->size);
 	}
 
 	usleep(10000); /* Without this small sleep, time() does not

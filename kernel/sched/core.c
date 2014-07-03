@@ -3156,7 +3156,7 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 
 		dl_se->sched_poll_replenish_period= timespec_to_ktime(attr->sched_poll_replenish_period);
 		dl_se->sched_poll_initial_budget=timespec_to_ktime(attr->sched_poll_initial_budget);
-		dl_se->sched_poll_maximum_replenish=attr->sched_poll_max_replenish;
+//		dl_se->sched_poll_maximum_replenish=attr->sched_poll_max_replenish;
 		dl_se->sched_poll_current_usage= ns_to_ktime(0);
 
 	    hrtimer_init(&dl_se->sched_poll_replenish_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
@@ -3164,9 +3164,9 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 //		hrtimer_init(&dl_se->sched_poll_exhaustion_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 //		dl_se->sched_poll_exhaustion_timer.function = sched_poll_exhaustion_cb;
 
-		dl_se->sched_poll_replenish_list[0].replenish_amt = dl_se->sched_poll_initial_budget;
-		dl_se->sched_poll_replenish_list[0].replenish_time = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
-		dl_se->replenish_head = 0;
+//		dl_se->sched_poll_replenish_list[0].replenish_amt = dl_se->sched_poll_initial_budget;
+//		dl_se->sched_poll_replenish_list[0].replenish_time = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
+//		dl_se->replenish_head = 0;
 
 		/*Runtime is set to 0 , so dl_bw = 0*/
 //		dl_se->dl_bw = to_ratio(dl_se->dl_period, dl_se->dl_runtime);
