@@ -128,16 +128,9 @@ struct sched_attr {
 	/*SCHED_POLL*/
 	struct timespec sched_poll_replenish_period;
 	struct timespec sched_poll_initial_budget;
-	int sched_poll_max_replenish;
 	/*CHANGES END HERE*/
 };
 
-/*CHANGES HERE*/
-struct sched_poll_replenish {
-	ktime_t replenish_amt;
-	ktime_t replenish_time;
-};
-/*CHANGES END HERE*/
 
 
 struct exec_domain;

@@ -75,6 +75,10 @@ static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
 		hrtimer_add_expires(timer, interval);
 	} while(ktime_compare(hrtimer_get_expires(timer), now) <= 0);
 
+
+	printk(KERN_ERR " FINALLY ");
+	printk(KERN_ERR " POLL FUNCTION : \t%lld, \t %lld\t %lld\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,hrtimer_get_expires(&p->dl.dl_timer).tv64);
+
 	return periods;
 }
 
@@ -565,6 +569,8 @@ static int start_dl_timer(struct sched_dl_entity *dl_se, bool boosted)
 
 	hrtimer_set_expires(&dl_se->dl_timer, act);
 
+
+
 	soft = hrtimer_get_softexpires(&dl_se->dl_timer);
 	hard = hrtimer_get_expires(&dl_se->dl_timer);
 	range = ktime_to_ns(ktime_sub(hard, soft));
@@ -948,13 +954,35 @@ static void dequeue_dl_entity(struct sched_dl_entity *dl_se)
 	__dequeue_dl_entity(dl_se);
 }
 
-static bool sched_poll_unblock_check(struct rq *rq, struct task_struct *p, ktime_t now, bool start_repl_timer, bool running)
+static void sched_poll_unblock_check(struct rq *rq, struct task_struct *p, ktime_t now, bool start_repl_timer, bool running)
 {
+	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	struct sched_dl_entity *dl_se;
 	dl_se = &p->dl;
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
+	printk(KERN_ERR " Before restart");
+
+//	hrtimer_set_expires(&dl_se->dl_timer, act);
+//	soft = hrtimer_get_softexpires(&dl_se->dl_timer);
+//	hard = hrtimer_get_expires(&dl_se->dl_timer);
+//	range = ktime_to_ns(ktime_sub(hard, soft));
+//	__hrtimer_start_range_ns(&dl_se->dl_timer, soft,
+//				 range, HRTIMER_MODE_ABS, 0);
+//
+//	return hrtimer_active(&dl_se->dl_timer);
+
+	if(hrtimer_active(&dl_se->sched_poll_replenish_timer)){
+		printk(KERN_ERR " Already active");
+	}else{
+		printk(KERN_ERR " Restarting");
+		printk(KERN_ERR " hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer).tv64);
+		printk(KERN_ERR " hrtimer_get_expires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_expires(&dl_se->sched_poll_replenish_timer).tv64);
+		hrtimer_restart(&dl_se->sched_poll_replenish_timer);
+	}
+	printk(KERN_ERR " After restart");
 	sched_poll_fwd_repl_timer(p, now);
-	return false;
+	printk(KERN_ERR " hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer).tv64);
+	printk(KERN_ERR " hrtimer_get_expires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_expires(&dl_se->sched_poll_replenish_timer).tv64);
+	return;
 }
 
 
@@ -1017,6 +1045,10 @@ static void dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 	 * dequeue, so any functions called can use p->on_rq and it will be
 	 * accurate.  p->on_rq will be set after this function.
 	 */
+
+	WARN_ON_ONCE(!hrtimer_active(&p->dl.sched_poll_replenish_timer));
+	WARN_ON_ONCE(hrtimer_try_to_cancel(&p->dl.sched_poll_replenish_timer) == -1);
+
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	__dequeue_task_dl(rq, p, flags);
 }
@@ -1255,8 +1287,7 @@ static void task_dead_dl(struct task_struct *p)
 	dl_b->total_bw -= p->dl.dl_bw;
 	raw_spin_unlock_irq(&dl_b->lock);
 
-	WARN_ON_ONCE(!hrtimer_active(&p->dl.sched_poll_replenish_timer));
-	WARN_ON_ONCE(hrtimer_try_to_cancel(&p->dl.sched_poll_replenish_timer) == -1);
+
 	hrtimer_cancel(timer);
 }
 

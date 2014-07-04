@@ -3151,33 +3151,19 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 	/*CHANGES HERE*/
 	if(poll_policy(p->policy)){
 		ktime_t now;
-		/*Initial deadline equal to period if not exhausted*/
-//		dl_se->dl_period = ktime_to_ns(timespec_to_ktime(attr->sched_poll_replenish_period));
-
 		dl_se->sched_poll_replenish_period= timespec_to_ktime(attr->sched_poll_replenish_period);
 		dl_se->sched_poll_initial_budget=timespec_to_ktime(attr->sched_poll_initial_budget);
-//		dl_se->sched_poll_maximum_replenish=attr->sched_poll_max_replenish;
 		dl_se->sched_poll_current_usage= ns_to_ktime(0);
 
 	    hrtimer_init(&dl_se->sched_poll_replenish_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 		dl_se->sched_poll_replenish_timer.function = sched_poll_replenish_cb;
-//		hrtimer_init(&dl_se->sched_poll_exhaustion_timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
-//		dl_se->sched_poll_exhaustion_timer.function = sched_poll_exhaustion_cb;
-
-//		dl_se->sched_poll_replenish_list[0].replenish_amt = dl_se->sched_poll_initial_budget;
-//		dl_se->sched_poll_replenish_list[0].replenish_time = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
-//		dl_se->replenish_head = 0;
-
-		/*Runtime is set to 0 , so dl_bw = 0*/
-//		dl_se->dl_bw = to_ratio(dl_se->dl_period, dl_se->dl_runtime);
 
 		printk(KERN_ERR "SCHED_POLL init : dl_bw = %lld" , dl_se->dl_bw);
 		printk(KERN_ERR "SCHED_POLL init : sched_poll_replenish_period = %lld" , dl_se->sched_poll_replenish_period.tv64);
 		printk(KERN_ERR "SCHED_POLL init : sched_poll_initial_budget = %lld" , dl_se->sched_poll_initial_budget.tv64);
 
 		now = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
-		hrtimer_set_expires(&dl_se->sched_poll_replenish_timer, dl_se->sched_poll_replenish_period);
-//		hrtimer_set_expires(&dl_se->sched_poll_exhaustion_timer, dl_se->sched_poll_initial_budget);
+		hrtimer_set_expires(&dl_se->sched_poll_replenish_timer, now);
 	}
 
 
