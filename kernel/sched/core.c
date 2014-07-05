@@ -1723,6 +1723,7 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	memset(&p->se.statistics, 0, sizeof(p->se.statistics));
 #endif
 
+	//Look here
 	RB_CLEAR_NODE(&p->dl.rb_node);
 	hrtimer_init(&p->dl.dl_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	p->dl.dl_runtime = p->dl.runtime = 0;
@@ -3162,8 +3163,7 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 		printk(KERN_ERR "SCHED_POLL init : sched_poll_replenish_period = %lld" , dl_se->sched_poll_replenish_period.tv64);
 		printk(KERN_ERR "SCHED_POLL init : sched_poll_initial_budget = %lld" , dl_se->sched_poll_initial_budget.tv64);
 
-		now = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
-		hrtimer_set_expires(&dl_se->sched_poll_replenish_timer, now);
+
 	}
 
 

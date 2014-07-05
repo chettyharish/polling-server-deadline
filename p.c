@@ -68,7 +68,7 @@ static int sched_setattr(pid_t pid, const struct sched_attr *attr,
 static struct timespec setupTSfromMS(long long int time) {
 	struct timespec ts;
 	ts.tv_sec = time;
-	ts.tv_nsec = (time % 1000000) * 1000000;
+	ts.tv_nsec = 0;//(time % 1000000) * 1000000;
 
 	return ts;
 }
@@ -237,6 +237,19 @@ int main(int argc, char *argv[]) {
 	usleep(10000); /* Without this small sleep, time() does not
 	 seem to return an up-to-date time. Some VDSO
 	 effect? */
+
+	long long int count =0;
+	while(1){
+
+
+		if(count<1000){
+			count++;
+			printf("Printing number %lld \n", count);
+		}
+		else
+			break;
+	}
+
 	printf("Successful return from sched_setattr() [%ld seconds]\n",
 			(long) time(NULL) - base);
 
