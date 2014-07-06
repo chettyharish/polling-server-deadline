@@ -22,29 +22,35 @@
 struct dl_bandwidth def_dl_bandwidth;
 
 /*CHANGES HERE*/
+static void update_curr_dl(struct rq *rq);
 
-static inline ktime_t sched_poll_capacity(struct task_struct *p, ktime_t now)
+static inline int sched_poll_capacity(struct task_struct *p, ktime_t now)
 {
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	printk(KERN_ERR " POLL FUNCTION : \t%lld\t%lld\n", p->dl.sched_poll_initial_budget,p->dl.sched_poll_current_usage);
-    return ktime_sub(p->dl.sched_poll_initial_budget, p->dl.sched_poll_current_usage);
+	printk(KERN_ERR " POLL FUNCTION : \t%lld\t%lld\n", p->dl.sched_poll_initial_budget,p->dl.sched_poll_current_usage.tv64	);
+    return ktime_compare(p->dl.sched_poll_initial_budget, p->dl.sched_poll_current_usage);
 }
 
 static inline int sched_poll_out_of_budget(struct task_struct *p, ktime_t now)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
+	struct rq *rq = task_rq(p);
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if(!poll_task(p))
 		return 0;
 
-	if((ktime_compare(sched_poll_capacity(p, now), ns_to_ktime(0))) <= 0){
+	if(sched_poll_capacity(p, now) <= 0){
 		printk(KERN_ERR " POLL FUNCTION : throttled ");
 		dl_se->dl_throttled=1;
-		return 1;
 	}
 	else{
-		return 0;
+		printk(KERN_ERR " POLL FUNCTION : unthrottle ");
+		dl_se->dl_throttled=0;
+		return 1;
 	}
+
+	update_curr_dl(rq);
+	return 0;
 }
 
 static inline ktime_t sched_poll_get_now(struct task_struct *p)
@@ -64,20 +70,27 @@ static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
 
 	if (ktime_compare(hrtimer_get_expires(timer), now) > 0) {
 		/* timer already set to beginning of next period */
-		printk(KERN_ERR " POLL FUNCTION : \t%lld, \t %lld\t %d\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,ktime_compare(hrtimer_get_expires(timer), now));
+		printk(KERN_ERR " POLL FUNCTION Timer already set: \t%lld, \t %lld\t %d\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,ktime_compare(hrtimer_get_expires(timer), now));
 		return 0;
 	}
 
 	do {
-		printk(KERN_ERR " POLL FUNCTION : \t%lld, \t %lld\t %d\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,ktime_compare(hrtimer_get_expires(timer), now));
-
 		periods++;
 		hrtimer_add_expires(timer, interval);
 	} while(ktime_compare(hrtimer_get_expires(timer), now) <= 0);
 
+	if(ktime_compare(p->dl.sched_poll_current_usage,p->dl.sched_poll_replenish_period)<0){
+		/*Error as usage has exceeded replenish period -> IMPOSSIBLE condition*/
+		printk(KERN_ERR " POLL FUNCTION Danger timer crash imminent \n");
+	}else{
+		/*Within limits*/
+		printk(KERN_ERR " POLL FUNCTION Under limit \n");
+		hrtimer_set_expires(timer,ktime_add(ktime_sub(p->dl.sched_poll_replenish_period,p->dl.sched_poll_current_usage),now));
+	}
+
 
 	printk(KERN_ERR " FINALLY ");
-	printk(KERN_ERR " POLL FUNCTION : \t%lld, \t %lld\t %lld\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,hrtimer_get_expires(&p->dl.dl_timer).tv64);
+	printk(KERN_ERR " POLL FUNCTION : \t%lld, \t %lld\t %lld\n",  now.tv64 ,hrtimer_get_expires(timer).tv64,p->dl.sched_poll_current_usage.tv64);
 
 	return periods;
 }
@@ -673,8 +686,7 @@ int dl_runtime_exceeded(struct rq *rq, struct sched_dl_entity *dl_se)
 	 * If we are beyond our current deadline and we are still
 	 * executing, then we have already used some of the runtime of
 	 * the next instance. Thus, if we do not account that, we are
-	 * stealing bandwidth 		now = hrtimer_cb_get_time(&dl_se->sched_poll_replenish_timer);
-		hrtimer_set_expires(&dl_se->sched_poll_replenish_timer, now);from the system at each deadline miss!
+	 * stealing bandwidth from the system at each deadline miss!
 	 */
 	if (dmiss) {
 		dl_se->runtime = rorun ? dl_se->runtime : 0;
@@ -724,9 +736,9 @@ static void update_curr_dl(struct rq *rq)
 	cpuacct_charge(curr, delta_exec);
 
 	sched_rt_avg_update(rq, delta_exec);
-
+	printk(KERN_ERR " delta = %lld \tdl_se->runtime = %lld\n",delta_exec, dl_se->runtime);
 	dl_se->runtime -= delta_exec;
-
+	printk(KERN_ERR " delta = %lld \tdl_se->runtime = %lld\n",delta_exec, dl_se->runtime);
 	/*CHANGES HERE*/
 	if(poll_task(curr)){
 		printk(KERN_ERR " delta = %lld \tdl_se->sched_poll_current_usage = %lld\n",delta_exec, dl_se->sched_poll_current_usage.tv64);
@@ -735,7 +747,7 @@ static void update_curr_dl(struct rq *rq)
 	}
 
 	/*Setting runtime to 0 will force dequeue a task for SCHED_POLL*/
-	if (dl_runtime_exceeded(rq, dl_se) || sched_poll_out_of_budget(curr,sched_poll_get_now(curr))) {
+	if (dl_runtime_exceeded(rq, dl_se)) {
 	/*CHANGES END HERE*/
 		__dequeue_task_dl(rq, curr, 0);
 		if (likely(start_dl_timer(dl_se, curr->dl.dl_boosted)))
@@ -964,16 +976,11 @@ static void sched_poll_unblock_check(struct rq *rq, struct task_struct *p, ktime
 
 	sched_poll_fwd_repl_timer(p, now);
 
-	if(hrtimer_active(&dl_se->sched_poll_replenish_timer)){
-		printk(KERN_ERR " Already active");
-	}else{
-		printk(KERN_ERR " Restarting");
-		printk(KERN_ERR " hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer).tv64);
-		printk(KERN_ERR " hrtimer_get_expires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_expires(&dl_se->sched_poll_replenish_timer).tv64);
-		hrtimer_restart(&dl_se->sched_poll_replenish_timer);
-	}
-	printk(KERN_ERR " After restart");
+	printk(KERN_ERR " hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer).tv64);
+	printk(KERN_ERR " hrtimer_get_expires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_expires(&dl_se->sched_poll_replenish_timer).tv64);
+	hrtimer_restart(&dl_se->sched_poll_replenish_timer);
 
+	printk(KERN_ERR " After restart");
 	printk(KERN_ERR " hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_softexpires(&dl_se->sched_poll_replenish_timer).tv64);
 	printk(KERN_ERR " hrtimer_get_expires(&dl_se->sched_poll_replenish_timer) -> %lld \n" ,hrtimer_get_expires(&dl_se->sched_poll_replenish_timer).tv64);
 	return;
@@ -1039,8 +1046,6 @@ static void dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 	 * dequeue, so any functions called can use p->on_rq and it will be
 	 * accurate.  p->on_rq will be set after this function.
 	 */
-	now = hrtimer_cb_get_time(&p->dl.sched_poll_replenish_timer);
-	hrtimer_set_expires(&p->dl.sched_poll_replenish_timer, now);
 
 	WARN_ON_ONCE(hrtimer_try_to_cancel(&p->dl.sched_poll_replenish_timer) == -1);
 	__dequeue_task_dl(rq, p, flags);
@@ -1869,11 +1874,6 @@ enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 	ktime_t budget = ns_to_ktime(0);;
 
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	dl_se = container_of(timer, struct sched_dl_entity, sched_poll_replenish_timer);
 	p=dl_task_of(dl_se);
 	rq = task_rq(p);
@@ -1887,33 +1887,27 @@ enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 
 	/* exh timer may be active if task was preempted for a long time */
 	if (ktime_compare(p->dl.sched_poll_current_usage, p->dl.sched_poll_initial_budget) > 0) {
-		budget = ktime_sub(p->dl.sched_poll_initial_budget, p->dl.sched_poll_current_usage);
-
+		budget = ktime_sub(p->dl.sched_poll_current_usage , p->dl.sched_poll_initial_budget);
 		/* -5000 is just a fudge factor */
-		if (budget.tv64 < 0) {
 			printk(KERN_ERR "budget overrun: %lld\n", (u64)budget.tv64);
-		}
-
 	}
 
-	//Budget is negative for overrun's , and zero for no overrun's
-		p->dl.sched_poll_current_usage = ktime_sub(ns_to_ktime(0),budget);
-
-
-	periods_passed = sched_poll_fwd_repl_timer(p, hrtimer_get_expires(timer));
+		p->dl.sched_poll_current_usage = ns_to_ktime(0);
+		periods_passed = sched_poll_fwd_repl_timer(p, hrtimer_get_expires(timer));
+		/*Penalty must be after forwarding to avoid double penalty*/
+		p->dl.sched_poll_current_usage = ktime_add(p->dl.sched_poll_current_usage,budget);
 
 	/* handles skipped periods */
 	/* now is relative to start of previous period, prevents drift */
 	now = ktime_sub(hrtimer_get_expires(timer), p->dl.sched_poll_replenish_period);
 
 	if (ktime_compare(now, ns_to_ktime(0)) == -1)
-		printk(KERN_ERR "SCHED_SPORADIC: negative now\n");
+		printk(KERN_ERR "POLL FUNCTION : now is negative\n");
 
 	if (periods_passed != 1)
 		printk(KERN_ERR "SCHED_SPORADIC: replenishment timer skipped a period\n");
 
-	if(!sched_poll_out_of_budget(p, now))
-			dl_se->dl_throttled=0;
+	sched_poll_out_of_budget(p, now);
 
 	raw_spin_unlock(&rq->lock);
 
@@ -1924,11 +1918,8 @@ enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 static void sched_poll_budget_check(struct rq *rq, struct task_struct *p, ktime_t now, bool blocked)
 {
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	assert_raw_spin_locked(&task_rq(p)->lock);
-
-	if (sched_poll_out_of_budget(p, now)) {
-		resched_task(p);
-	}
+	//assert_raw_spin_locked(&task_rq(p)->lock);
+	sched_poll_out_of_budget(p, now);
 }
 
 void cs_notify_rt(struct rq *rq, struct task_struct *prev,
