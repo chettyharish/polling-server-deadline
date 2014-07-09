@@ -1175,9 +1175,6 @@ struct sched_dl_entity {
 	 * own bandwidth to be enforced, thus we need one timer per task.
 	 */
 	struct hrtimer dl_timer;
-
-
-
 	/*CHANGES HERE*/
 
 	ktime_t sched_poll_replenish_period;
@@ -1187,10 +1184,7 @@ struct sched_dl_entity {
 
 	/* SCHED_POLL timers */
 	struct hrtimer sched_poll_replenish_timer;
-
 	/*CHANGES END HERE*/
-
-
 };
 
 struct rcu_node;
