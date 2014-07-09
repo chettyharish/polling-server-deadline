@@ -67,8 +67,8 @@ static int sched_setattr(pid_t pid, const struct sched_attr *attr,
 
 static struct timespec setupTSfromMS(long long int time) {
 	struct timespec ts;
-	ts.tv_sec = time;
-	ts.tv_nsec = 0;//(time % 1000000) * 1000000;
+	ts.tv_sec = 0;
+	ts.tv_nsec = time*1000*1000;
 
 	return ts;
 }
@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
 	flags = 0;
 	size = sizeof(struct sched_attr);
 	val = 0;
-	timeFactor = 1000 * 1000 * 1000;
+	timeFactor = 1000 * 1000;
 
 	while ((opt = getopt(argc, argv, "fmnp:s:v:w:")) != -1) {
 		switch (opt) {
@@ -202,11 +202,11 @@ int main(int argc, char *argv[]) {
 		if (argc != optind + 4)
 			usageError(argv[0]);
 		sa->sched_policy = SCHED_POLL;
-		sa->sched_runtime = atoll(argv[optind + 1]) * timeFactor;
-		sa->sched_deadline = atoll(argv[optind + 2]) * timeFactor;
-		sa->sched_period = atoll(argv[optind + 2]) * timeFactor;
+		sa->sched_runtime = atoll(argv[optind + 3]) * timeFactor;
+		sa->sched_deadline = atoll(argv[optind + 3]) * timeFactor;
+		sa->sched_period = atoll(argv[optind + 3]) * timeFactor;
 		sa->sched_poll_replenish_period = setupTSfromMS(
-				atoll(argv[optind + 3]));
+				atoll(argv[optind + 2]));
 		sa->sched_poll_initial_budget = setupTSfromMS(atoll(argv[optind + 1]));
 		sa->sched_poll_max_replenish = 0;
 
@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
 	while(1){
 
 
-		if(count<1000){
+		if(count<1000000){
 			count++;
 			printf("Printing number %lld \n", count);
 		}

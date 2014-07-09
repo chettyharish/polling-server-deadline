@@ -31,26 +31,37 @@ static inline int sched_poll_capacity(struct task_struct *p, ktime_t now)
     return ktime_compare(p->dl.sched_poll_initial_budget, p->dl.sched_poll_current_usage);
 }
 
-static inline int sched_poll_out_of_budget(struct task_struct *p, ktime_t now)
+static inline void sched_poll_out_of_budget(struct task_struct *p, ktime_t now)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
 	struct rq *rq = task_rq(p);
+	int status_changed = 0;
+
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if(!poll_task(p))
-		return 0;
+		return;
 
 	if(sched_poll_capacity(p, now) <= 0){
 		printk(KERN_ERR " POLL FUNCTION : throttled ");
+		if(dl_se->dl_throttled==0)
+			status_changed =1 ;
+
 		dl_se->dl_throttled=1;
 	}
 	else{
 		printk(KERN_ERR " POLL FUNCTION : unthrottle ");
+		if(dl_se->dl_throttled==1)
+			status_changed =1 ;
+
 		dl_se->dl_throttled=0;
-		return 1;
 	}
 
-	update_curr_dl(rq);
-	return 0;
+	if(status_changed==1){
+		update_rq_clock(rq);
+		update_curr_dl(rq);
+	}
+
+	return;
 }
 
 static inline ktime_t sched_poll_get_now(struct task_struct *p)
@@ -800,9 +811,9 @@ static struct task_struct *pick_next_earliest_dl_task(struct rq *rq, int cpu);
 
 static inline u64 next_deadline(struct rq *rq)
 {
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	struct task_struct *next = pick_next_earliest_dl_task(rq, rq->cpu);
 
+	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (next && dl_prio(next->prio))
 		return next->dl.deadline;
 	else
@@ -811,9 +822,9 @@ static inline u64 next_deadline(struct rq *rq)
 
 static void inc_dl_deadline(struct dl_rq *dl_rq, u64 deadline)
 {
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	struct rq *rq = rq_of_dl_rq(dl_rq);
 
+	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (dl_rq->earliest_dl.curr == 0 ||
 	    dl_time_before(deadline, dl_rq->earliest_dl.curr)) {
 		/*
@@ -839,9 +850,9 @@ static void inc_dl_deadline(struct dl_rq *dl_rq, u64 deadline)
 
 static void dec_dl_deadline(struct dl_rq *dl_rq, u64 deadline)
 {
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	struct rq *rq = rq_of_dl_rq(dl_rq);
 
+	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	/*
 	 * Since we may have removed our earliest (and/or next earliest)
 	 * task we must recompute them.
@@ -1061,7 +1072,6 @@ static void dequeue_task_dl(struct rq *rq, struct task_struct *p, int flags)
 	 * accurate.  p->on_rq will be set after this function.
 	 */
 
-	WARN_ON_ONCE(hrtimer_try_to_cancel(&p->dl.sched_poll_replenish_timer) == -1);
 	__dequeue_task_dl(rq, p, flags);
 }
 
@@ -1200,7 +1210,7 @@ static struct sched_dl_entity *pick_next_dl_entity(struct rq *rq,
 						   struct dl_rq *dl_rq)
 {
 	struct rb_node *left = dl_rq->rb_leftmost;
-
+//	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (!left)
 		return NULL;
 
@@ -1214,7 +1224,7 @@ struct task_struct *pick_next_task_dl(struct rq *rq, struct task_struct *prev)
 	struct dl_rq *dl_rq;
 
 	dl_rq = &rq->dl;
-
+//	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (need_pull_dl_task(rq, prev)) {
 		pull_dl_task(rq);
 		/*
@@ -1300,6 +1310,7 @@ static void task_dead_dl(struct task_struct *p)
 	raw_spin_unlock_irq(&dl_b->lock);
 
 
+	hrtimer_cancel(&p->dl.sched_poll_replenish_timer);
 	hrtimer_cancel(timer);
 }
 
@@ -1512,10 +1523,10 @@ static struct task_struct *pick_next_pushable_dl_task(struct rq *rq)
  */
 static int push_dl_task(struct rq *rq)
 {
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	struct task_struct *next_task;
 	struct rq *later_rq;
 
+	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (!rq->dl.overloaded)
 		return 0;
 	printk(KERN_ERR " POLL FUNCTION : DL not overloaded" );
@@ -1692,29 +1703,19 @@ static void post_schedule_dl(struct rq *rq)
 static void task_woken_dl(struct rq *rq, struct task_struct *p)
 {
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
-	if(!task_running(rq, p) && poll_task(p)){
-		if(!sched_poll_out_of_budget(p,sched_poll_get_now(p))){
-			printk(KERN_ERR " POLL FUNCTION : POLL TASK PUSHING");
-			push_dl_tasks(rq);
-		}else
-		{
-			printk(KERN_ERR " POLL FUNCTION : POLL TASK NOTHING");
-		}
-	}
-	else{
-	if (!task_running(rq, p) &&
-	    !test_tsk_need_resched(rq->curr) &&
-	    has_pushable_dl_tasks(rq) &&
-	    p->nr_cpus_allowed > 1 &&
-	    dl_task(rq->curr) &&
-	    (rq->curr->nr_cpus_allowed < 2 ||
-	     dl_entity_preempt(&rq->curr->dl, &p->dl))) {
-		printk(KERN_ERR " POLL FUNCTION : DL TASK");
+	if(p->dl.dl_throttled!=1){
+		if (!task_running(rq, p) &&
+			!test_tsk_need_resched(rq->curr) &&
+			has_pushable_dl_tasks(rq) &&
+			p->nr_cpus_allowed > 1 &&
+			dl_task(rq->curr) &&
+			(rq->curr->nr_cpus_allowed < 2 ||
+			 dl_entity_preempt(&rq->curr->dl, &p->dl))) {
+			printk(KERN_ERR " POLL FUNCTION : DL TASK");
 				push_dl_tasks(rq);
 		}
 	}
 }
-
 static void set_cpus_allowed_dl(struct task_struct *p,
 				const struct cpumask *new_mask)
 {
@@ -1894,8 +1895,6 @@ enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 
 	raw_spin_lock(&rq->lock);
 
-
-
 	running = task_running(rq, p);
 
 	/* exh timer may be active if task was preempted for a long time */
@@ -1910,8 +1909,12 @@ enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 		/*Penalty must be after forwarding to avoid double penalty*/
 		p->dl.sched_poll_current_usage = ktime_add(p->dl.sched_poll_current_usage,budget);
 
-		update_rq_clock(rq);
-		update_curr_dl(rq);
+//		update_rq_clock(rq);
+//		update_curr_dl(rq);
+
+		if(!running){
+			printk(KERN_ERR "POLL FUNCTION : TASK NOT RUNNING\n");
+		}
 
 	/* handles skipped periods */
 	/* now is relative to start of previous period, prevents drift */
