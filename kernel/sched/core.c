@@ -2725,10 +2725,10 @@ need_resched:
 		rq->curr = next;
 		++*switch_count;
 
-		/*CHANGES HERE*/
+		/*Notifying SCHED_POLL to modify current task status if required*/
 		if(prev->policy == SCHED_POLL || next->policy == SCHED_POLL)
 			cs_notify_rt(rq, prev, next);
-		/*CHANGES END HERE*/
+
 
 
 		context_switch(rq, prev, next); /* unlocks the rq */
@@ -3149,9 +3149,10 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 	dl_se->dl_new = 1;
 	dl_se->dl_yielded = 0;
 
-	/*CHANGES HERE*/
+	/*
+	 * SCHED_POLL attributes
+	 * */
 	if(poll_policy(p->policy)){
-		ktime_t now;
 		dl_se->sched_poll_replenish_period= timespec_to_ktime(attr->sched_poll_replenish_period);
 		dl_se->sched_poll_initial_budget=timespec_to_ktime(attr->sched_poll_initial_budget);
 		dl_se->sched_poll_current_usage= ns_to_ktime(0);
@@ -3166,8 +3167,6 @@ __setparam_dl(struct task_struct *p, const struct sched_attr *attr)
 
 	}
 
-
-	/*CHANGES END HERE*/
 
 }
 

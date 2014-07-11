@@ -3,9 +3,7 @@
 #include <linux/sched/sysctl.h>
 #include <linux/sched/rt.h>
 #include <linux/sched/deadline.h>
-/*CHANGES HERE*/
 #include <linux/sched/sched_poll.h>
-/*CHANGES END HERE*/
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/stop_machine.h>
@@ -85,17 +83,22 @@ static inline int rt_policy(int policy)
 	return policy == SCHED_FIFO || policy == SCHED_RR;
 }
 
+/*
+ * A SCHED_POLL task is also a SCHED_DEADLINE task
+ * */
 static inline int dl_policy(int policy)
 {
 	return (policy == SCHED_DEADLINE) || (policy == SCHED_POLL);
 }
 
-/*CHANGES HERE*/
+/*
+ * Returns whether current task has SCHED_POLL policy or not
+ * */
 static inline int poll_policy(int policy)
 {
 	return policy == SCHED_POLL;
 }
-/*CHANGES END HERE*/
+
 
 static inline int task_has_rt_policy(struct task_struct *p)
 {
@@ -107,12 +110,12 @@ static inline int task_has_dl_policy(struct task_struct *p)
 	return dl_policy(p->policy);
 }
 
-/*CHANGES HERE*/
+
 static inline int task_has_poll_policy(struct task_struct *p)
 {
 	return poll_policy(p->policy);
 }
-/*CHANGES END HERE*/
+
 
 static inline bool dl_time_before(u64 a, u64 b)
 {
@@ -1217,10 +1220,9 @@ extern void init_sched_rt_class(void);
 extern void init_sched_fair_class(void);
 extern void init_sched_dl_class(void);
 
-/*CHANGES HERE*/
+
 extern void cs_notify_rt(struct rq *rq, struct task_struct *prev, struct task_struct *next);
 extern enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer);
-/*CHANGES END HERE*/
 
 extern void resched_task(struct task_struct *p);
 extern void resched_cpu(int cpu);

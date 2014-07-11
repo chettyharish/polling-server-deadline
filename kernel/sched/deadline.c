@@ -21,7 +21,7 @@
 
 struct dl_bandwidth def_dl_bandwidth;
 
-/*CHANGES HERE*/
+
 static void update_curr_dl(struct rq *rq);
 static int dl_runtime_exceeded(struct rq *rq, struct sched_dl_entity *dl_se);
 static void enqueue_task_dl(struct rq *rq, struct task_struct *p, int flags);
@@ -36,6 +36,12 @@ static int push_dl_task(struct rq *rq);
 static inline int has_pushable_dl_tasks(struct rq *rq);
 #endif
 
+/**
+ * Returns the current capacity status of the SCHED_POLL process
+ * return < 0 if task has consumed more than its allotted budget
+ * return 	0 if task has consumed equal to its allotted budget
+ * return > 0 if task has consumed less than its allotted budget
+ */
 static inline int sched_poll_capacity(struct task_struct *p, ktime_t now)
 {
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
@@ -43,7 +49,13 @@ static inline int sched_poll_capacity(struct task_struct *p, ktime_t now)
     return ktime_compare(p->dl.sched_poll_initial_budget, p->dl.sched_poll_current_usage);
 }
 
-static inline void sched_poll_out_of_budget(struct task_struct *p, ktime_t now)
+
+/**
+ * Throttles/Releases SCED_POLL task depending on its left budget
+ * if budget is exhausted, then the status changes to throttle (dl_throttled=1) and the task is dequeued unless its boosted in critical section
+ * if budget is replenished, then the status changes to released (dl_throttled=0) and the task is enqueued back
+ */
+static inline void sched_poll_throttle_control(struct task_struct *p, ktime_t now)
 {
 	struct sched_dl_entity *dl_se = &p->dl;
 	struct rq *rq = task_rq(p);
@@ -97,7 +109,6 @@ static inline void sched_poll_out_of_budget(struct task_struct *p, ktime_t now)
 		}
 	}
 
-
 	if(status_changed==1){
 		printk(KERN_ERR " POLL FUNCTION : \t STATUS CHANGED\n");
 	}else{
@@ -107,12 +118,20 @@ static inline void sched_poll_out_of_budget(struct task_struct *p, ktime_t now)
 	return;
 }
 
+/*
+ * Returns the current time based of the replenishment timer
+ * */
 static inline ktime_t sched_poll_get_now(struct task_struct *p)
 {
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	return hrtimer_cb_get_time(&p->dl.sched_poll_replenish_timer);
 }
 
+/*
+ * Forwards the expiration of replenishment timer by increments of replenishment period
+ * till the timer is in the future and the periods skipped is returned back
+ * (skipped periods are useful for identifying lagging tasks)
+ * */
 static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
 {
 	int periods = 0;
@@ -150,7 +169,6 @@ static int sched_poll_fwd_repl_timer(struct task_struct *p, ktime_t now)
 }
 
 
-/*CHANGES END HERE*/
 
 static inline struct task_struct *dl_task_of(struct sched_dl_entity *dl_se)
 {
@@ -273,9 +291,9 @@ static void update_dl_migration(struct dl_rq *dl_rq)
 
 static void inc_dl_migration(struct sched_dl_entity *dl_se, struct dl_rq *dl_rq)
 {
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	struct task_struct *p = dl_task_of(dl_se);
 
+	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (p->nr_cpus_allowed > 1)
 		dl_rq->dl_nr_migratory++;
 
@@ -439,6 +457,9 @@ static inline void setup_new_dl_entity(struct sched_dl_entity *dl_se,
 	dl_se->runtime = pi_se->dl_runtime;
 	dl_se->dl_new = 0;
 
+	/**
+	 * Restarting the timer to ensure that no delays creep in
+	 */
 	if(poll_task(p)){
 		sched_poll_fwd_repl_timer(p, sched_poll_get_now(p));
 		hrtimer_restart(&dl_se->sched_poll_replenish_timer);
@@ -700,10 +721,15 @@ again:
 	if (!dl_task(p) || dl_se->dl_new)
 		goto unlock;
 
-	/*CHANGES HERE*/
+
+	/*
+	 * The related operations of resetting the attributes
+	 * by default CBS is disabled in SHCED_POLL
+	 * We handle this by our replenishment timer
+	 * */
 	if(poll_task(p))
 		goto unlock;
-	/*CHANGES END HERE*/
+
 
 	sched_clock_tick();
 	update_rq_clock(rq);
@@ -809,10 +835,21 @@ static void update_curr_dl(struct rq *rq)
 	cpuacct_charge(curr, delta_exec);
 
 	sched_rt_avg_update(rq, delta_exec);
+
+	/*
+	 * If SCHED_POLL task is active, then runtime is not modified
+	 * It works like original settings under SCHED_DEADLINE
+	 * (This is to ensure that bw allocated is always maximum)
+	 * */
+
+
 	printk(KERN_ERR " delta = %lld \tdl_se->runtime = %lld\n",delta_exec, dl_se->runtime);
-	//dl_se->runtime -= delta_exec;
+	if(!poll_task(curr))
+		dl_se->runtime -= delta_exec;
 	printk(KERN_ERR " delta = %lld \tdl_se->runtime = %lld\n",delta_exec, dl_se->runtime);
 	/*CHANGES HERE*/
+
+	/*Current usage tracks how much time a task has used */
 	if(poll_task(curr)){
 		printk(KERN_ERR " delta = %lld \tdl_se->sched_poll_current_usage = %lld\n",delta_exec, dl_se->sched_poll_current_usage.tv64);
 		dl_se->sched_poll_current_usage = ktime_add_ns(dl_se->sched_poll_current_usage, delta_exec);
@@ -1133,7 +1170,7 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 {
 	struct task_struct *curr;
 	struct rq *rq;
-
+	int target;
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	if (sd_flag != SD_BALANCE_WAKE && sd_flag != SD_BALANCE_FORK)
 		goto out;
@@ -1162,7 +1199,7 @@ select_task_rq_dl(struct task_struct *p, int cpu, int sd_flag, int flags)
 
 	if (unlikely(dl_task(curr)) && (curr->nr_cpus_allowed < 2 || !dl_entity_preempt(&p->dl, &curr->dl)) && (p->nr_cpus_allowed > 1)) {
 		printk(KERN_ERR " POLL FUNCTION : \t FIND NEW CPU");
-		int target = find_later_rq(p);
+		target = find_later_rq(p);
 
 		if (target != -1)
 			cpu = target;
@@ -1811,9 +1848,9 @@ static void rq_offline_dl(struct rq *rq)
 
 void init_sched_dl_class(void)
 {
-	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	unsigned int i;
 
+	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	for_each_possible_cpu(i)
 		zalloc_cpumask_var_node(&per_cpu(local_cpu_mask_dl, i),
 					GFP_KERNEL, cpu_to_node(i));
@@ -1906,6 +1943,12 @@ static void prio_changed_dl(struct rq *rq, struct task_struct *p,
 }
 
 
+/*
+ * Is set to replenish the replenishment timer after fixed intervals
+ * budge_overruns are noted and the penalty is applied in next round
+ * (Uses throttle control function to release task)
+ *
+ * */
 enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 {
 	struct sched_dl_entity *dl_se;
@@ -1913,7 +1956,7 @@ enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 	struct rq *rq;
 	int periods_passed;
 	ktime_t now;
-	ktime_t budget = ns_to_ktime(0);;
+	ktime_t budget_overrun = ns_to_ktime(0);;
 
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	dl_se = container_of(timer, struct sched_dl_entity, sched_poll_replenish_timer);
@@ -1926,15 +1969,15 @@ enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 
 	/* exh timer may be active if task was preempted for a long time */
 	if (ktime_compare(p->dl.sched_poll_current_usage, p->dl.sched_poll_initial_budget) > 0) {
-		budget = ktime_sub(p->dl.sched_poll_current_usage , p->dl.sched_poll_initial_budget);
+		budget_overrun = ktime_sub(p->dl.sched_poll_current_usage , p->dl.sched_poll_initial_budget);
 		/* -5000 is just a fudge factor */
-			printk(KERN_ERR "budget overrun: %lld\n", (u64)budget.tv64);
+			printk(KERN_ERR "budget overrun: %lld\n", (u64)budget_overrun.tv64);
 	}
 
 		p->dl.sched_poll_current_usage = ns_to_ktime(0);
 		periods_passed = sched_poll_fwd_repl_timer(p, hrtimer_get_expires(timer));
 		/*Penalty must be after forwarding to avoid double penalty*/
-		p->dl.sched_poll_current_usage = ktime_add(p->dl.sched_poll_current_usage,budget);
+		p->dl.sched_poll_current_usage = ktime_add(p->dl.sched_poll_current_usage,budget_overrun);
 
 
 
@@ -1948,19 +1991,28 @@ enum hrtimer_restart sched_poll_replenish_cb(struct hrtimer *timer)
 	if (periods_passed != 1)
 		printk(KERN_ERR "SCHED_SPORADIC: replenishment timer skipped a period\n");
 
-	sched_poll_out_of_budget(p, now);
+	sched_poll_throttle_control(p, now);
 
 	raw_spin_unlock(&rq->lock);
 	return HRTIMER_RESTART;
 }
 
 
+/*
+ * Used when __sched __schedule from core.c to check if
+ * task needs throttling/releasing or no changes
+ * */
 static void sched_poll_budget_check(struct rq *rq, struct task_struct *p, ktime_t now, bool blocked)
 {
 	printk(KERN_ERR " POLL FUNCTION : \t%s\n", __func__);
 	assert_raw_spin_locked(&task_rq(p)->lock);
-	sched_poll_out_of_budget(p, now);
+	sched_poll_throttle_control(p, now);
 }
+
+/*
+ * Used to notify that __sched_schedule was called with
+ * either current or next task using SCHED_POLL
+ * */
 
 void cs_notify_rt(struct rq *rq, struct task_struct *prev,
               struct task_struct *next)

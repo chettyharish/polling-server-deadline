@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
 	 seem to return an up-to-date time. Some VDSO
 	 effect? */
 
-	long long int count =0;
+	volatile long long int count =0;
 	while(1){
 
 

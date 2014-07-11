@@ -41,10 +41,8 @@
 #define SCHED_IDLE		5
 #define SCHED_DEADLINE		6
 
-
-/*CHANGES HERE*/
+/*SCHED POLL policy definition*/
 #define SCHED_POLL	7
-/*CHANGES END HERE*/
 
 
 

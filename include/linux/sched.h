@@ -1175,8 +1175,16 @@ struct sched_dl_entity {
 	 * own bandwidth to be enforced, thus we need one timer per task.
 	 */
 	struct hrtimer dl_timer;
-	/*CHANGES HERE*/
 
+
+
+
+	/* SCHED_POLL attributes
+	 * sched_poll_replenish_period defines the intervals between consequent budget replenishment
+	 * sched_poll_initial_budget is the buget a task is allotted to run
+	 * sched_poll_current_usage is a variable to track tasks current usage
+	 * sched_poll_replenish_timer timer to replenish the budget
+	 * */
 	ktime_t sched_poll_replenish_period;
 	ktime_t sched_poll_initial_budget;
 	ktime_t sched_poll_current_usage;
@@ -1184,7 +1192,7 @@ struct sched_dl_entity {
 
 	/* SCHED_POLL timers */
 	struct hrtimer sched_poll_replenish_timer;
-	/*CHANGES END HERE*/
+
 };
 
 struct rcu_node;
